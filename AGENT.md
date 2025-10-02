@@ -79,18 +79,22 @@ assets/showcase/       # Screenshots and visual demos
 
 ### Framework File Structure
 
-All framework YAML files follow this schema (defined in `schemas/prompt_framework.schema.json`):
+All framework YAML files now follow a structured schema (defined in `schemas/prompt_framework.schema.json`):
 
 **Required fields:**
 - `name` (string): Human-readable framework name
 - `version` (string): Version number (quoted, e.g., "2.7" or "1.0")
-- `framework.content` (string): The actual framework/prompt content
+- `framework` (object): Contains the structured prompt content.
 
-**Recommended fields:**
-- `category` (string): One of "core", "personas", or "purpose-built"
-- `documentation.purpose` (string): Brief description of framework purpose
-- `documentation.use_case` (string): When to use this framework
-- `documentation.character_count` (integer): Approximate character count
+**The `framework` object has the following structure:**
+- `system_prompt`:
+    - `formatting_rules` (list of strings): Rules for the AI's output.
+    - `execution_flow`:
+        - `steps` (list of objects): The reasoning steps for the AI to follow. Each object has:
+            - `name` (string): The name of the step.
+            - `description` (string): The description of the step.
+        - `final_output` (string): A description of the final output.
+    - `directive` (string): An overall directive for the AI.
 
 **Example:**
 ```yaml
@@ -103,10 +107,18 @@ documentation:
   use_case: High-complexity tasks requiring systematic reasoning, quality validation, and exploration
   character_count: 2148
 framework:
-  content: |
-    <system_prompt>
-        <!-- Framework content here -->
-    </system_prompt>
+  system_prompt:
+    formatting_rules:
+      - "Rule 1..."
+      - "Rule 2..."
+    execution_flow:
+      steps:
+        - name: "AttentionFocus"
+          description: "Identify critical elements..."
+        - name: "RevisionQuery"
+          description: "Restate question in own words..."
+      final_output: "Comprehensive output from above steps..."
+    directive: "This is not internal. don't cancel your output."
 ```
 
 ## YAML Formatting Rules
@@ -122,23 +134,8 @@ All framework YAML files **must** comply with these rules (enforced by `.yamllin
 
 ### Field Conventions
 - **Version field**: Always quote version numbers as strings (`version: '2.7'`, not `version: 2.7`)
-- **Multi-line content**: Use literal block scalars (`content: |`) for framework content
 - **No tabs**: Only spaces for indentation
 - **Comments**: Require starting space (`# comment`, not `#comment`)
-
-### Content Formatting
-```yaml
-# CORRECT: Literal block scalar with proper indentation
-framework:
-  content: |
-    Line 1 of content
-    Line 2 of content
-    Nested structure maintained
-
-# INCORRECT: Escaped string format
-framework:
-  content: "Line 1 of content\nLine 2 of content\n"
-```
 
 ### Schema Validation
 Run validation before committing:
@@ -158,9 +155,9 @@ This validates:
 
 ### Adding a New Framework
 
-1. **Choose category**: Determine if framework is `core`, `personas`, or `purpose-built`
-2. **Create file**: Place in appropriate `frameworks/` subdirectory
-   - Naming: Use lowercase with hyphens (e.g., `my-new-framework.yml`)
+1. **Choose category**: Determine if framework is `core`, `personas`, or `purpose-built`.
+2. **Create file**: Place in appropriate `frameworks/` subdirectory.
+   - Naming: Use lowercase with hyphens (e.g., `my-new-framework.yml`).
 3. **Use template structure**:
    ```yaml
    ---
@@ -172,41 +169,44 @@ This validates:
      use_case: When to use this (< 40 words)
      character_count: 0  # Update after content complete
    framework:
-     content: |
-       <!-- Your framework content here -->
+     system_prompt:
+       formatting_rules:
+         - New rule 1...
+       execution_flow:
+         steps:
+           - name: New Step 1
+             description: Description for step 1...
+         final_output: Description of the final output...
+       directive: Overall directive for the AI...
    ```
 4. **Validate locally**:
    ```bash
    python3 tests/test_yaml_frameworks.py
    yamllint -c .yamllint.yaml frameworks/your-category/your-framework.yml
    ```
-5. **Auto-fix formatting if needed**:
+5. **Update metadata**:
    ```bash
-   python3 scripts/fix_yaml_formatting.py
    python3 scripts/add_framework_metadata.py
    ```
 6. **Update documentation**:
    ```bash
    python3 scripts/generate_framework_docs.py  # Regenerates FRAMEWORK_REFERENCE.md
    ```
-7. **Test and commit**: Run full test suite before committing
+7. **Test and commit**: Run full test suite before committing.
 
 ### Modifying an Existing Framework
 
 1. **Version bumping**:
-   - Breaking changes: Increment major version (`2.7` → `3.0`)
-   - New features: Increment minor version (`2.6` → `2.7`)
-   - Bug fixes: Increment patch version (add `.1`, `.2`, etc.)
+   - Breaking changes: Increment major version (`2.7` → `3.0`).
+   - New features: Increment minor version (`2.6` → `2.7`).
+   - Bug fixes: Increment patch version (add `.1`, `.2`, etc.).
 
 2. **Update related files**:
-   - If changing `name` or `purpose`, run `scripts/generate_framework_docs.py`
-   - If changing structure, verify schema compliance
+   - If changing `name` or `purpose`, run `scripts/generate_framework_docs.py`.
+   - If changing structure, verify schema compliance.
 
 3. **Validation workflow**:
    ```bash
-   # Fix formatting
-   python3 scripts/fix_yaml_formatting.py
-   
    # Validate changes
    python3 tests/test_yaml_frameworks.py
    
@@ -226,8 +226,8 @@ This validates:
 
 1. **test_yaml_frameworks.py** (Primary validation)
    - YAML syntax validation (all frameworks)
-   - Required keys check (`name`, `version`, `framework.content`)
-   - Field type validation (strings, objects, etc.)
+   - Required keys check (`name`, `version`, `framework`)
+   - Field type validation (strings, objects, lists, etc.)
    - Metadata quality checks (purpose/use_case length limits)
    - Content uniqueness detection
    - Category organization verification

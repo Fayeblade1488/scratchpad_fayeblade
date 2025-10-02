@@ -1,9 +1,15 @@
 #!/usr/bin/env python3
-"""
-Convert framework files from XML-in-strings to proper YAML nesting.
+"""Convert framework files from XML-in-strings to proper YAML nesting.
 
-This script converts frameworks that use XML embedded in string literals
-to proper YAML structures with nested dictionaries and lists.
+This script is designed to refactor legacy framework files that embed
+an XML-like structure within a single 'content' string. It parses this
+string and converts it into a native, nested YAML structure under a new
+'structure' key.
+
+The original XML-like content is preserved in a 'legacy_content' field
+for reference, and the old 'content' key is removed. The script is
+idempotent and will skip any files that it determines have already been
+converted.
 """
 
 import yaml
@@ -13,7 +19,18 @@ from typing import Dict, Any, List
 
 
 def clean_text(text: str) -> str:
-    """Clean and normalize text content."""
+    """Cleans and normalizes a block of text.
+
+    This function performs two main cleaning operations:
+    1.  Reduces multiple consecutive newlines into a maximum of two.
+    2.  Removes leading and trailing whitespace from each line.
+
+    Args:
+        text (str): The input string to clean.
+
+    Returns:
+        str: The cleaned and normalized string.
+    """
     # Remove excessive whitespace
     text = re.sub(r'\n\s*\n\s*\n+', '\n\n', text)
     # Remove trailing/leading whitespace from each line
@@ -22,19 +39,34 @@ def clean_text(text: str) -> str:
 
 
 def parse_scratchpad_sections(content: str) -> List[str]:
-    """Extract scratchpad section names from bracketed format."""
+    """Extracts scratchpad section names from a bracketed format.
+
+    For example, from "[AttentionFocus: ...]", it extracts "AttentionFocus".
+
+    Args:
+        content (str): The string content containing bracketed sections.
+
+    Returns:
+        List[str]: A list of the extracted section names.
+    """
     pattern = r'\[([^:]+):.*?\]'
     sections = re.findall(pattern, content)
     return [s.strip() for s in sections]
 
 
 def parse_xml_to_yaml(content: str) -> Dict[str, Any]:
-    """
-    Parse XML-like content and convert to YAML structure.
+    """Recursively parses an XML-like string into a YAML structure.
 
-    Converts:
-    <role>text</role> -> {"role": "text"}
-    <scratchpad flow>...</scratchpad flow> -> {"scratchpad_flow": {...}}
+    This function identifies XML-like tags (e.g., <role>...</role>) and
+    converts them into key-value pairs in a dictionary. It handles
+    nested tags, simple text content, and a special format for
+    bracketed scratchpad sections.
+
+    Args:
+        content (str): The XML-like string to parse.
+
+    Returns:
+        Dict[str, Any]: A dictionary representing the structured data.
     """
     result = {}
 
@@ -52,38 +84,28 @@ def parse_xml_to_yaml(content: str) -> Dict[str, Any]:
         return {"content": clean_text(content)}
 
     for tag_name, tag_content in matches:
-        # Clean tag name
-        clean_tag = tag_name.strip().lower()
-        clean_tag = re.sub(r'[\s-]+', '_', clean_tag)
-
+        clean_tag = tag_name.strip().lower().replace(' ', '_')
         tag_content = tag_content.strip()
 
-        # Check if content has nested tags
+        # Check if content has nested tags for recursion
         if re.search(r'<[^/>]+>.*?</[^>]+>', tag_content, re.DOTALL):
-            # Recursively parse nested content
-            nested = parse_xml_to_yaml(tag_content)
-            result[clean_tag] = nested
-        # Check for bracketed sections (scratchpad format)
+            result[clean_tag] = parse_xml_to_yaml(tag_content)
+        # Check for the special bracketed scratchpad format
         elif '[' in tag_content and ']:' in tag_content:
             sections = parse_scratchpad_sections(tag_content)
-            # Extract instructions before the template
             instructions_match = re.search(r'^(.+?)```', tag_content, re.DOTALL)
             instructions = clean_text(instructions_match.group(1)) if instructions_match else None
 
-            result[clean_tag] = {
-                "format": "bracketed_sections",
-                "sections": sections,
-            }
+            result[clean_tag] = {"format": "bracketed_sections", "sections": sections}
             if instructions:
                 result[clean_tag]["usage"] = instructions
             result[clean_tag]["template"] = clean_text(tag_content)
         else:
-            # Simple text content
             result[clean_tag] = clean_text(tag_content)
 
-    # Handle content outside tags (instructions, separators)
+    # Handle any text content outside of the main tags
     remaining = re.sub(tag_pattern, '', content, flags=re.DOTALL).strip()
-    remaining = re.sub(r'-{3,}', '', remaining).strip()  # Remove separator lines
+    remaining = re.sub(r'-{3,}', '', remaining).strip()
     remaining = clean_text(remaining)
 
     if remaining:
@@ -93,82 +115,79 @@ def parse_xml_to_yaml(content: str) -> Dict[str, Any]:
 
 
 def convert_framework(yaml_file: Path) -> bool:
-    """
-    Convert a single framework file to proper YAML structure.
+    """Converts a single framework file to a structured YAML format.
 
-    Returns True if conversion was made, False if no conversion needed.
+    This function reads a framework file, checks if it needs conversion,
+    parses the legacy 'content' field, and writes a new structured
+    format back to the file.
+
+    Args:
+        yaml_file (Path): The path to the framework file to convert.
+
+    Returns:
+        bool: True if the file was converted, False if it was skipped.
     """
     with open(yaml_file, 'r', encoding='utf-8') as f:
         data = yaml.safe_load(f)
 
-    if not isinstance(data, dict):
+    if not isinstance(data, dict) or 'framework' not in data or 'content' not in data['framework']:
         return False
 
-    # Check if framework.content exists
-    if 'framework' not in data or 'content' not in data['framework']:
-        return False
-
-    content = data['framework']['content']
-
-    # Check if already converted (has 'structure' key)
     if 'structure' in data['framework']:
         return False
 
-    # Check if content contains XML-like tags or needs conversion
+    content = data['framework']['content']
     has_xml = re.search(r'<[^/>]+>.*?</[^>]+>', content, re.DOTALL)
     has_brackets = '[' in content and ']:' in content
 
     if not (has_xml or has_brackets):
-        # Plain content, no conversion needed
         return False
 
     print(f"Converting: {yaml_file.name}")
 
-    # Parse the content to YAML structure
-    parsed = parse_xml_to_yaml(content)
+    parsed_structure = parse_xml_to_yaml(content)
 
-    # Update framework with proper YAML structure
-    data['framework']['structure'] = parsed
-    # Keep original for reference
+    data['framework']['structure'] = parsed_structure
     data['framework']['legacy_content'] = content
-    # Remove old content key
     del data['framework']['content']
 
-    # Write back as proper YAML
     with open(yaml_file, 'w', encoding='utf-8') as f:
-        # Add document start marker
         f.write('---\n')
-        yaml.dump(data, f,
-                  default_flow_style=False,
-                  allow_unicode=True,
-                  sort_keys=False,
-                  width=120,
-                  indent=2,
-                  explicit_start=False)  # We already wrote ---
+        yaml.dump(data, f, default_flow_style=False, allow_unicode=True, sort_keys=False, width=120, indent=2)
 
     return True
 
 
-def main():
-    """Main conversion routine."""
+def main() -> int:
+    """Main entry point for the conversion script.
+
+    Iterates through all YAML files in the `frameworks` directory,
+    converts them if necessary, and prints a summary of the results.
+
+    Returns:
+        int: An exit code, 0 for success, 1 for failure.
+    """
     frameworks_dir = Path(__file__).parent.parent / 'frameworks'
 
-    if not frameworks_dir.exists():
-        print(f"Error: {frameworks_dir} does not exist")
+    if not frameworks_dir.is_dir():
+        print(f"Error: Directory '{frameworks_dir}' not found.")
         return 1
 
-    converted = 0
-    skipped = 0
+    converted_count = 0
+    skipped_count = 0
 
     for yaml_file in sorted(frameworks_dir.glob('**/*.yml')):
-        if convert_framework(yaml_file):
-            converted += 1
-        else:
-            skipped += 1
+        try:
+            if convert_framework(yaml_file):
+                converted_count += 1
+            else:
+                skipped_count += 1
+        except Exception as e:
+            print(f"Error converting {yaml_file.name}: {e}")
 
     print("\nConversion complete:")
-    print(f"  Converted: {converted} files")
-    print(f"  Skipped: {skipped} files")
+    print(f"  Converted: {converted_count} files")
+    print(f"  Skipped: {skipped_count} files")
 
     return 0
 

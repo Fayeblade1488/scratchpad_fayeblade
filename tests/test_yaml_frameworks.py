@@ -1,7 +1,20 @@
 #!/usr/bin/env python3
-"""
-YAML Framework Validation Test Suite
-Validates all Scratchpad framework YAML files for syntax, structure, and semantic quality.
+"""YAML Framework Validation Test Suite.
+
+This script validates all Scratchpad framework YAML files to ensure they
+adhere to syntax, structure, and quality standards. It is the primary
+test suite for maintaining the integrity of the framework collection.
+
+The suite includes the following checks:
+-   **Syntax Validation**: Ensures all `.yml` files are valid YAML.
+-   **Required Keys**: Verifies the presence of essential keys like `name`,
+    `category`, `documentation`, and `framework`.
+-   **Field Types**: Checks that key fields have the correct data type.
+-   **Metadata Quality**: Assesses the conciseness and presence of
+    `purpose` and `use_case` fields.
+-   **Content Uniqueness**: Performs a basic check for duplicate content.
+-   **Category Organization**: Verifies that frameworks are in the correct
+    category directories.
 
 Author: Warp AI Agent
 Date: 2025-10-01
@@ -11,73 +24,86 @@ import sys
 import yaml
 from pathlib import Path
 import re
+from typing import List, Dict, Any
 
-def test_yaml_syntax():
-    """Test that all YAML files have valid syntax."""
+def test_yaml_syntax() -> bool:
+    """Tests that all YAML files have valid syntax.
+
+    Iterates through all `.yml` files in the `frameworks` directory and
+    attempts to parse them using `yaml.safe_load`.
+
+    Returns:
+        bool: True if all files parse successfully, False otherwise.
+    """
     base_dir = Path(__file__).parent.parent
     frameworks_dir = base_dir / 'frameworks'
-    
     yaml_files = list(frameworks_dir.glob('**/*.yml'))
-    if not yaml_files:
-        print("❌ FAIL: No YAML files found")
-        return False
     
-    print(f"Found {len(yaml_files)} YAML files")
+    print(f"Found {len(yaml_files)} YAML files to check for syntax.")
     
-    passed = 0
-    failed = 0
+    passed_count = 0
+    failed_count = 0
     
     for yaml_file in yaml_files:
         try:
             with open(yaml_file, 'r', encoding='utf-8') as f:
                 yaml.safe_load(f)
             print(f"  ✅ {yaml_file.relative_to(base_dir)}")
-            passed += 1
-        except Exception as e:
+            passed_count += 1
+        except yaml.YAMLError as e:
             print(f"  ❌ {yaml_file.relative_to(base_dir)}: {e}")
-            failed += 1
+            failed_count += 1
     
-    print(f"\nYAML Syntax: {passed} passed, {failed} failed")
-    return failed == 0
+    print(f"\nYAML Syntax: {passed_count} passed, {failed_count} failed")
+    return failed_count == 0
 
 
-def test_required_keys():
-    """Test that all frameworks have required keys."""
+def test_required_keys() -> bool:
+    """Tests that all frameworks have the required top-level keys.
+
+    Checks for the presence of 'name', 'category', 'documentation',
+    and 'framework'.
+
+    Returns:
+        bool: True if all files have the required keys, False otherwise.
+    """
     base_dir = Path(__file__).parent.parent
     frameworks_dir = base_dir / 'frameworks'
-    
     required_keys = ['name', 'category', 'documentation', 'framework']
     
     yaml_files = list(frameworks_dir.glob('**/*.yml'))
-    passed = 0
-    failed = 0
+    passed_count = 0
+    failed_count = 0
     
     for yaml_file in yaml_files:
-        try:
-            with open(yaml_file, 'r', encoding='utf-8') as f:
-                data = yaml.safe_load(f)
-            
-            if not isinstance(data, dict):
-                print(f"  ❌ {yaml_file.name}: Not a YAML dictionary")
-                failed += 1
-                continue
-            
-            missing_keys = [key for key in required_keys if key not in data]
-            if missing_keys:
-                print(f"  ⚠️  {yaml_file.name}: Missing keys {missing_keys}")
-                failed += 1
-            else:
-                passed += 1
-        except Exception as e:
-            print(f"  ❌ {yaml_file.name}: {e}")
-            failed += 1
+        with open(yaml_file, 'r', encoding='utf-8') as f:
+            data = yaml.safe_load(f)
+
+        if not isinstance(data, dict):
+            print(f"  ❌ {yaml_file.name}: Not a valid YAML dictionary.")
+            failed_count += 1
+            continue
+
+        missing_keys = [key for key in required_keys if key not in data]
+        if missing_keys:
+            print(f"  ❌ {yaml_file.name}: Missing required keys: {missing_keys}")
+            failed_count += 1
+        else:
+            passed_count += 1
     
-    print(f"Required Keys: {passed} passed, {failed} failed")
-    return failed == 0
+    print(f"Required Keys: {passed_count} passed, {failed_count} failed")
+    return failed_count == 0
 
 
-def test_framework_categories():
-    """Test that frameworks are in correct directories."""
+def test_framework_categories() -> bool:
+    """Tests that frameworks are organized into the correct categories.
+
+    Verifies the directory structure and ensures a minimum number of
+    frameworks exist in each category.
+
+    Returns:
+        bool: True if the category structure is valid, False otherwise.
+    """
     base_dir = Path(__file__).parent.parent
     frameworks_dir = base_dir / 'frameworks'
     
@@ -87,171 +113,145 @@ def test_framework_categories():
         'personas': list((frameworks_dir / 'personas').glob('*.yml'))
     }
     
-    print("Framework Categories:")
+    print("Framework Category Counts:")
     for category, files in categories.items():
-        print(f"  {category}: {len(files)} frameworks")
-    
-    # Verify minimum counts
-    if len(categories['core']) < 5:
-        print("  ⚠️  Warning: Less than 5 core frameworks")
-    if len(categories['personas']) < 2:
-        print("  ⚠️  Warning: Less than 2 persona frameworks")
+        print(f"  - {category}: {len(files)} frameworks")
     
     total = sum(len(files) for files in categories.values())
-    print(f"\nTotal: {total} frameworks")
+    print(f"\nTotal frameworks: {total}")
     
-    return total >= 20  # Expect at least 20 frameworks
+    return total >= 20
 
 
-def test_metadata_quality():
-    """Test quality and consistency of framework metadata."""
+def test_metadata_quality() -> bool:
+    """Tests the quality and consistency of framework metadata.
+
+    Checks for the presence and conciseness of 'purpose' and 'use_case'
+    fields, and ensures a 'version' field exists.
+
+    Returns:
+        bool: True if warnings are below a certain threshold, False otherwise.
+    """
     base_dir = Path(__file__).parent.parent
     frameworks_dir = base_dir / 'frameworks'
-    
     yaml_files = list(frameworks_dir.glob('**/*.yml'))
-    passed = 0
     warnings = []
     
     for yaml_file in yaml_files:
-        try:
-            with open(yaml_file, 'r', encoding='utf-8') as f:
-                data = yaml.safe_load(f)
+        with open(yaml_file, 'r', encoding='utf-8') as f:
+            data = yaml.safe_load(f)
+
+        if not data or 'documentation' not in data:
+            warnings.append(f"  - {yaml_file.name}: Missing 'documentation' section.")
+            continue
             
-            # Check documentation fields
-            if 'documentation' in data:
-                doc = data['documentation']
-                
-                # Check purpose length (should be concise)
-                if 'purpose' in doc and doc['purpose']:
-                    purpose_words = len(doc['purpose'].split())
-                    if purpose_words > 30:
-                        warnings.append(f"  ⚠️  {yaml_file.name}: Purpose too long ({purpose_words} words, recommend <30)")
-                else:
-                    warnings.append(f"  ⚠️  {yaml_file.name}: Missing or empty purpose field")
-                
-                # Check use_case field
-                if 'use_case' in doc and doc['use_case']:
-                    use_case_words = len(doc['use_case'].split())
-                    if use_case_words > 40:
-                        warnings.append(f"  ⚠️  {yaml_file.name}: Use case too long ({use_case_words} words, recommend <40)")
-                else:
-                    warnings.append(f"  ⚠️  {yaml_file.name}: Missing or empty use_case field")
+        doc = data['documentation']
+        if not doc.get('purpose') or len(doc['purpose'].split()) > 30:
+            warnings.append(f"  - {yaml_file.name}: 'purpose' is missing or too long (>30 words).")
+        if not doc.get('use_case') or len(doc['use_case'].split()) > 40:
+            warnings.append(f"  - {yaml_file.name}: 'use_case' is missing or too long (>40 words).")
+        if not data.get('version'):
+            warnings.append(f"  - {yaml_file.name}: Missing 'version' field.")
             
-            # Check version field
-            if 'version' not in data or not data['version']:
-                warnings.append(f"  ⚠️  {yaml_file.name}: Missing or empty version field")
-            
-            # Check content field
-            if 'framework' in data and 'content' in data['framework']:
-                content = data['framework']['content']
-                if len(content) < 100:
-                    warnings.append(f"  ⚠️  {yaml_file.name}: Framework content seems too short ({len(content)} chars)")
-            
-            passed += 1
-        except Exception as e:
-            warnings.append(f"  ❌ {yaml_file.name}: Error reading file - {e}")
-    
-    # Print warnings
     if warnings:
         print("\nMetadata Quality Warnings:")
         for warning in warnings:
             print(warning)
     
-    print(f"\nMetadata Quality: {passed} files checked, {len(warnings)} warnings")
-    return len(warnings) < 10  # Allow some warnings but not too many
+    print(f"\nMetadata Quality: {len(yaml_files)} files checked, {len(warnings)} warnings found.")
+    return len(warnings) < 10  # Allow a few warnings, but fail if there are too many.
 
 
-def test_field_types():
-    """Validate that YAML fields have correct data types."""
+def test_field_types() -> bool:
+    """Validates that key YAML fields have the correct data types.
+
+    Returns:
+        bool: True if all checked fields have the correct types, False otherwise.
+    """
     base_dir = Path(__file__).parent.parent
     frameworks_dir = base_dir / 'frameworks'
-    
     yaml_files = list(frameworks_dir.glob('**/*.yml'))
-    passed = 0
-    failed = 0
+    failed_count = 0
     
     for yaml_file in yaml_files:
-        try:
-            with open(yaml_file, 'r', encoding='utf-8') as f:
-                data = yaml.safe_load(f)
+        with open(yaml_file, 'r', encoding='utf-8') as f:
+            data = yaml.safe_load(f)
+
+        errors = []
+        if not isinstance(data.get('name'), str): errors.append("'name' must be a string")
+        if not isinstance(data.get('version'), str): errors.append("'version' must be a string")
+        if not isinstance(data.get('category'), str): errors.append("'category' must be a string")
+        if not isinstance(data.get('documentation'), dict): errors.append("'documentation' must be a dictionary")
+        if not isinstance(data.get('framework'), dict): errors.append("'framework' must be a dictionary")
+
+        if errors:
+            print(f"  ❌ {yaml_file.name}: {', '.join(errors)}")
+            failed_count += 1
             
-            errors = []
-            
-            # Check string fields
-            if 'name' in data and not isinstance(data['name'], str):
-                errors.append("'name' must be a string")
-            if 'version' in data and not isinstance(data.get('version'), str):
-                errors.append("'version' must be a string")
-            if 'category' in data and not isinstance(data['category'], str):
-                errors.append("'category' must be a string")
-            
-            # Check nested dict fields
-            if 'documentation' in data and not isinstance(data['documentation'], dict):
-                errors.append("'documentation' must be a dictionary")
-            if 'framework' in data and not isinstance(data['framework'], dict):
-                errors.append("'framework' must be a dictionary")
-            
-            if errors:
-                print(f"  ❌ {yaml_file.name}: {', '.join(errors)}")
-                failed += 1
-            else:
-                passed += 1
-                
-        except Exception as e:
-            print(f"  ❌ {yaml_file.name}: {e}")
-            failed += 1
-    
-    print(f"Field Types: {passed} passed, {failed} failed")
-    return failed == 0
+    print(f"Field Types: {len(yaml_files) - failed_count} passed, {failed_count} failed")
+    return failed_count == 0
 
 
-def test_content_uniqueness():
-    """Detect highly similar content across frameworks."""
+def test_content_uniqueness() -> bool:
+    """Performs a functional check for duplicate content across frameworks.
+
+    This test creates a 'signature' for each framework based on its
+    documented purpose and the names of its execution steps. This provides
+    a more meaningful comparison than a simple string match.
+
+    Returns:
+        bool: True if no functional duplicates are found, False otherwise.
+    """
     base_dir = Path(__file__).parent.parent
     frameworks_dir = base_dir / 'frameworks'
-    
-    yaml_files = list(frameworks_dir.glob('**/*.yml'))
-    
-    # Extract first 500 chars of each framework's content
-    content_samples = {}
-    for yaml_file in yaml_files:
-        try:
-            with open(yaml_file, 'r', encoding='utf-8') as f:
-                data = yaml.safe_load(f)
-            if 'framework' in data and 'content' in data['framework']:
-                content = data['framework']['content']
-                # Normalize: lowercase, remove extra whitespace
-                normalized = re.sub(r'\s+', ' ', content[:500].lower())
-                content_samples[yaml_file.name] = normalized
-        except Exception:
+    framework_signatures: Dict[str, str] = {}
+
+    for yaml_file in frameworks_dir.glob('**/*.yml'):
+        with open(yaml_file, 'r', encoding='utf-8') as f:
+            data = yaml.safe_load(f)
+
+        if not data:
             continue
-    
-    # Simple similarity check - look for exact duplicates
+
+        try:
+            # Create a signature from purpose and step names
+            purpose = data.get('documentation', {}).get('purpose', '')
+
+            steps_data = data.get('framework', {}).get('system_prompt', {}).get('execution_flow', {}).get('steps', [])
+            step_names = sorted([step['name'] for step in steps_data if 'name' in step])
+
+            signature = f"purpose: {purpose.strip()} | steps: {','.join(step_names)}"
+            framework_signatures[yaml_file.name] = signature
+
+        except (AttributeError, KeyError, TypeError):
+            # Handle files that don't match the expected structure
+            continue
+
     duplicates = []
-    seen = {}
-    for name, content in content_samples.items():
-        if content in seen:
-            duplicates.append(f"  ⚠️  {name} may be similar to {seen[content]}")
+    seen_signatures: Dict[str, str] = {}
+    for name, signature in framework_signatures.items():
+        if signature in seen_signatures:
+            duplicates.append(f"  - {name} appears to be a functional duplicate of {seen_signatures[signature]}")
         else:
-            seen[content] = name
-    
+            seen_signatures[signature] = name
+
     if duplicates:
-        print("\nPotential Content Duplicates:")
+        print("\nPotential Functional Duplicates Found:")
         for dup in duplicates:
             print(dup)
-    else:
-        print("No obvious content duplication detected")
-    
+
     return len(duplicates) == 0
 
 
-def main():
-    """Run all tests."""
+def main() -> int:
+    """Runs all tests in the suite and prints a summary.
+
+    Returns:
+        int: An exit code, 0 if all critical tests pass, 1 otherwise.
+    """
     print("="*70)
     print(" YAML Framework Validation Test Suite")
-    print(" Enhanced with Semantic & Quality Checks")
     print("="*70)
-    print()
     
     tests = [
         ("YAML Syntax Validation", test_yaml_syntax),
@@ -259,34 +259,26 @@ def main():
         ("Field Type Validation", test_field_types),
         ("Metadata Quality Check", test_metadata_quality),
         ("Content Uniqueness Check", test_content_uniqueness),
-        ("Framework Categories", test_framework_categories),
+        ("Framework Categories Check", test_framework_categories),
     ]
     
-    passed = 0
-    failed = 0
-    warnings = 0
+    passed_count = 0
+    failed_count = 0
     
-    for test_name, test_func in tests:
-        print(f"\n--- {test_name} ---")
-        result = test_func()
-        if result:
-            print(f"✅ {test_name} PASSED")
-            passed += 1
+    for name, test_func in tests:
+        print(f"\n--- {name} ---")
+        if test_func():
+            print(f"✅ PASSED: {name}")
+            passed_count += 1
         else:
-            # Metadata quality and uniqueness can fail with warnings
-            if "Quality" in test_name or "Uniqueness" in test_name:
-                print(f"⚠️  {test_name} HAS WARNINGS")
-                warnings += 1
-            else:
-                print(f"❌ {test_name} FAILED")
-                failed += 1
+            print(f"❌ FAILED: {name}")
+            failed_count += 1
     
-    print()
-    print("="*70)
-    print(f"Test Results: {passed} passed, {failed} failed, {warnings} warnings")
+    print("\n" + "="*70)
+    print(f"Test Results: {passed_count} passed, {failed_count} failed")
     print("="*70)
     
-    return 0 if failed == 0 else 1
+    return 1 if failed_count > 0 else 0
 
 
 if __name__ == '__main__':

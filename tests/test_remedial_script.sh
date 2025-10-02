@@ -25,7 +25,7 @@ set -euo pipefail
 # Test configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BASE_DIR="$(dirname "$SCRIPT_DIR")"
-REMEDIAL_SCRIPT="$BASE_DIR/jules-kit/scripts/remedial.sh"
+REMEDIAL_SCRIPT="$BASE_DIR/scripts/remedial.sh"
 TEST_COUNT=0
 PASS_COUNT=0
 FAIL_COUNT=0

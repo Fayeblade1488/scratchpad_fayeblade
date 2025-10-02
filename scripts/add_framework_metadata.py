@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""
-Framework Metadata Generator
+"""Framework Metadata Generator.
 
-Intelligently generates purpose and use_case metadata for frameworks
-based on content analysis and naming patterns.
+This script intelligently generates and adds missing metadata to framework
+YAML files. It uses a template-based approach for known frameworks and
+generates generic metadata for unknown ones. The script can be run
+repeatedly and will only modify files that are missing required
+metadata fields (`purpose`, `use_case`, `version`).
 
 Author: Warp AI Agent
 Date: 2025-10-01
@@ -130,36 +132,39 @@ METADATA_TEMPLATES = {
 }
 
 def add_metadata_to_framework(yaml_path):
-    """Add metadata to a framework YAML file if missing.
-    
+    """Adds or updates metadata for a single framework YAML file.
+
+    This function reads a YAML file, checks for the presence of `purpose`,
+    `use_case`, and `version` metadata, and adds them if they are missing.
+    It uses a predefined template if the filename matches, otherwise it
+    generates generic metadata.
+
     Args:
-        yaml_path: Path object pointing to the YAML file
-        
+        yaml_path (Path): The path object pointing to the YAML framework file.
+
     Returns:
-        bool: True if file was modified, False if already complete
-        
+        bool: True if the file was modified, False otherwise.
+
     Raises:
-        yaml.YAMLError: If YAML parsing fails
-        IOError: If file operations fail
+        yaml.YAMLError: If the YAML file is malformed and cannot be parsed.
+        IOError: If there is an error reading or writing the file.
     """
     with open(yaml_path, 'r', encoding='utf-8') as f:
         data = yaml.safe_load(f)
     
-    # Guard against None data
+    # Guard against empty or invalid YAML files
     if not data:
         data = {}
     
-    # Extract framework base name
     filename = yaml_path.stem
     
-    # Try to find matching template
+    # Find a matching template or create a generic one
     template = None
     for key, meta in METADATA_TEMPLATES.items():
         if key in filename:
             template = meta
             break
     
-    # If no exact match, generate generic metadata
     if not template:
         category = yaml_path.parent.name
         template = {
@@ -168,9 +173,8 @@ def add_metadata_to_framework(yaml_path):
             'version': '1.0'
         }
     
-    # Check what's missing
     changed = False
-    doc = data.get('documentation', {}) if data else {}
+    doc = data.get('documentation', {})
     
     if not doc.get('purpose'):
         doc['purpose'] = template['purpose']
@@ -180,14 +184,13 @@ def add_metadata_to_framework(yaml_path):
         doc['use_case'] = template['use_case']
         changed = True
     
-    if not data.get('version') or data.get('version') == '':
+    if not data.get('version') or not str(data.get('version')).strip():
         data['version'] = template['version']
         changed = True
     
     if changed:
         data['documentation'] = doc
         
-        # Write back to file
         with open(yaml_path, 'w', encoding='utf-8') as f:
             yaml.dump(data, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
         
@@ -196,10 +199,14 @@ def add_metadata_to_framework(yaml_path):
     return False
 
 def main():
-    """Process all framework files.
-    
+    """Main function to process all framework files in the repository.
+
+    This function locates the 'frameworks' directory, iterates through all
+    '.yml' files, and calls `add_metadata_to_framework` for each one.
+    It prints a summary of the number of files updated and skipped.
+
     Returns:
-        int: Exit code (0 for success)
+        int: An exit code, 0 for success.
     """
     import os
     base_dir = Path(os.getenv('SCRATCHPAD_DIR', Path(__file__).parent.parent))
@@ -212,13 +219,16 @@ def main():
     print()
     
     for yaml_file in sorted(frameworks_dir.glob('**/*.yml')):
-        if add_metadata_to_framework(yaml_file):
-            print(f"✅ Updated: {yaml_file.name}")
-            updated_count += 1
-        else:
-            print(f"⏭️  Skipped: {yaml_file.name} (already complete)")
-            skipped_count += 1
-    
+        try:
+            if add_metadata_to_framework(yaml_file):
+                print(f"✅ Updated: {yaml_file.name}")
+                updated_count += 1
+            else:
+                print(f"⏭️  Skipped: {yaml_file.name} (already complete)")
+                skipped_count += 1
+        except (IOError, yaml.YAMLError) as e:
+            print(f"❌ Error processing {yaml_file.name}: {e}")
+
     print()
     print(f"✨ Complete! Updated {updated_count} files, skipped {skipped_count}")
     return 0

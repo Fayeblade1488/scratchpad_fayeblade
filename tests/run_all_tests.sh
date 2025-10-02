@@ -165,8 +165,8 @@ validate_test_environment() {
         issues+=("README.md not found in expected location")
     fi
     
-    if [ ! -d "$SCRIPT_DIR/../purpose-built" ]; then
-        issues+=("purpose-built directory not found")
+    if [ ! -d "$SCRIPT_DIR/../frameworks/purpose-built" ]; then
+        issues+=("purpose-built directory not found in frameworks/")
     fi
     
     if [ ${#issues[@]} -gt 0 ]; then

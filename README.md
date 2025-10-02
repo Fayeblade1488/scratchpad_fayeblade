@@ -31,17 +31,17 @@ scratchpad/
 ```
 
 ## Quick Start
-1. Choose a framework from `frameworks/` directory
-2. Copy the YAML content
-3. Use as system prompt in Comet Browser AI assistant
-4. Enjoy structured, transparent AI reasoning!
+1. **Choose a framework** from the `frameworks/` directory.
+2. **Understand the structure**: Each file contains a structured YAML prompt with defined steps and rules.
+3. **Integrate with your tools**: Parse the YAML and use the structured data to guide your AI's reasoning process.
+4. **Enjoy structured, transparent AI reasoning!**
 
 ## Framework Categories
 
 ### Core Frameworks (10)
 - `scratchpad-lite.yml` - Lightweight, 3-step reasoning
 - `scratchpad-2.6.yml` - Comprehensive 11-step analysis
-- `scratchpad-2.5-refined.yml` - Deep, multi-faceted reasoning
+- `scratchpad-2.7.yml` - Deep, multi-faceted reasoning
 - `scratchpad-concise.yml` - Short, to-the-point answers
 - `scratchpad-think.yml` - Metacognitive verbalization
 - Plus 5 more variants...
@@ -53,15 +53,19 @@ scratchpad/
 - `podsynth-clean.yml` - Podcast script generation
 - Plus 14 more specialized frameworks...
 
-### Persona Frameworks (2)
+### Persona Frameworks (8)
 - `gilfoyle-bot.yml` - Systems architecture expertise (cynical tone)
 - `anton-bot.yml` - Browser automation specialist
+- `debug-detective.yml` - Systematic problem-solver
+- `gemini-2.5.yaml` - Advanced, multi-modal AI persona
+- Plus 4 more...
 
 ## Technical Details
-- **Format:** YAML (machine-parsable, human-readable)
-- **Optimization:** Comet Browser character limit friendly
-- **Validation:** 100% YAML syntax passing
-- **Testing:** Comprehensive test suite included
+- **Format:** 100% structured YAML. No more XML-in-YAML.
+- **Schema**: All frameworks conform to a strict JSON Schema (`schemas/prompt_framework.schema.json`).
+- **Parsing**: Easily parsable with any standard YAML library.
+- **Validation:** 100% YAML syntax passing and schema validation.
+- **Testing:** Comprehensive test suite included.
 
 ## Testing
 ```bash
